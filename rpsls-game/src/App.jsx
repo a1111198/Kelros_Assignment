@@ -59,13 +59,28 @@ function App() {
 
   useEffect(() => { 
     console.log('Checking for Ethereum provider...');
+    // Check if window is defined (browser environment)
+    if (typeof window === 'undefined') {
+      console.log('Running in SSR environment, skipping Web3 initialization');
+      return;
+    }
+    
+    // Load stored games from localStorage
+    try {
+      setStoredGames(getStoredGames());
+    } catch (e) {
+      console.error('Failed to load stored games:', e);
+    }
+    
     console.log(window.ethereum);
     if (window.ethereum) {
       const p = new ethers.providers.Web3Provider(window.ethereum);
       console.log('Ethereum provider detected');
       setProvider(p);
       
-      p.getNetwork().then(net => setNetwork(net));
+      p.getNetwork().then(net => setNetwork(net)).catch(err => {
+        console.error('Failed to get network:', err);
+      });
       
       window.ethereum.on('accountsChanged', (accounts) => {
         if (accounts.length > 0) {
@@ -85,9 +100,6 @@ function App() {
     else{
       alert('hey man! install MetaMask or any Ethereum wallet to use this dApp!');
     }
-    
-    // Load stored games from localStorage
-    setStoredGames(getStoredGames());
   }, []);
 
   const connectWallet = async () => {
@@ -620,7 +632,7 @@ function App() {
                   <p>Player 2 played: <strong>{MOVE_NAMES[gameState.c2]}</strong></p>
                   {getGameData(contractAddress) ? (
                     <>
-                      <p className="auto-loaded">✓ Your move and salt are auto-loaded from saved game data</p>
+                     
                       <p>Your move: <strong>{MOVE_NAMES[revealData.move]}</strong></p>
                       <div className="form">
                         <button onClick={revealMove} disabled={loading || !revealData.salt}>

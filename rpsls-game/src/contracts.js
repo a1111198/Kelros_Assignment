@@ -180,50 +180,83 @@ export const STORAGE_KEY_PREFIX = 'rpsls_game_';
 
 // Get all stored games from localStorage
 export const getStoredGames = () => {
+  // Check if localStorage is available (browser environment)
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return {};
+  }
+  
   const games = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
-      const address = key.replace(STORAGE_KEY_PREFIX, '');
-      try {
-        games[address] = JSON.parse(localStorage.getItem(key));
-      } catch (e) {
-        console.error('Failed to parse game data for', address);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        const address = key.replace(STORAGE_KEY_PREFIX, '');
+        try {
+          games[address] = JSON.parse(localStorage.getItem(key));
+        } catch (e) {
+          console.error('Failed to parse game data for', address);
+        }
       }
     }
+  } catch (e) {
+    console.error('localStorage access error:', e);
   }
   return games;
 };
 
 // Save game data to localStorage with contract address as key
 export const saveGameData = (contractAddress, move, salt) => {
-  const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
-  const data = {
-    move,
-    salt: salt.toString(),
-    createdAt: Date.now()
-  };
-  localStorage.setItem(key, JSON.stringify(data));
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
+    const data = {
+      move,
+      salt: salt.toString(),
+      createdAt: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save game data:', e);
+  }
 };
 
 // Get game data from localStorage by contract address
 export const getGameData = (contractAddress) => {
-  const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
-  const data = localStorage.getItem(key);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      return null;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return null;
+  }
+  
+  try {
+    const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
+    const data = localStorage.getItem(key);
+    if (data) {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return null;
+      }
     }
+  } catch (e) {
+    console.error('Failed to get game data:', e);
   }
   return null;
 };
 
 // Remove game data from localStorage
 export const removeGameData = (contractAddress) => {
-  const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
-  localStorage.removeItem(key);
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.error('Failed to remove game data:', e);
+  }
 };
 
 // Result storage prefix
@@ -231,20 +264,36 @@ export const RESULT_KEY_PREFIX = 'rpsls_result_';
 
 // Save game result to localStorage
 export const saveGameResult = (contractAddress, result) => {
-  const key = RESULT_KEY_PREFIX + contractAddress.toLowerCase();
-  localStorage.setItem(key, JSON.stringify(result));
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    const key = RESULT_KEY_PREFIX + contractAddress.toLowerCase();
+    localStorage.setItem(key, JSON.stringify(result));
+  } catch (e) {
+    console.error('Failed to save game result:', e);
+  }
 };
 
 // Get game result from localStorage
 export const getGameResult = (contractAddress) => {
-  const key = RESULT_KEY_PREFIX + contractAddress.toLowerCase();
-  const data = localStorage.getItem(key);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      return null;
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return null;
+  }
+  
+  try {
+    const key = RESULT_KEY_PREFIX + contractAddress.toLowerCase();
+    const data = localStorage.getItem(key);
+    if (data) {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return null;
+      }
     }
+  } catch (e) {
+    console.error('Failed to get game result:', e);
   }
   return null;
 };
