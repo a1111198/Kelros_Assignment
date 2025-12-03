@@ -1,0 +1,307 @@
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+h1 {
+  text-align: center;
+  border-bottom: 2px solid #333;
+  padding-bottom: 10px;
+}
+
+h2 {
+  border-bottom: 1px solid #666;
+  padding-bottom: 5px;
+}
+
+.section {
+  margin: 30px 0;
+  padding: 20px;
+  border: 1px solid #ccc;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+label {
+  font-weight: bold;
+}
+
+input, select {
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background-color: #555;
+}
+
+button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 15px;
+  border: 1px solid #333;
+  margin: 20px 0;
+}
+
+.loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 20px 40px;
+  background-color: #333;
+  color: white;
+  font-size: 18px;
+  border: 2px solid #666;
+}
+
+.game-info {
+  padding: 15px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+}
+
+.game-info p {
+  margin: 5px 0;
+}
+
+.action-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ccc;
+}
+
+.stored-games {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stored-game-item {
+  padding: 10px;
+  border: 1px solid #ccc;
+}
+
+.stored-game-item p {
+  margin: 5px 0;
+}
+
+.stored-game-item button {
+  margin-top: 10px;
+}
+
+.game-result {
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+}
+
+.game-result p {
+  margin: 8px 0;
+}
+
+.game-result hr {
+  margin: 15px 0;
+  border: none;
+  border-top: 2px solid #333;
+}
+
+.auto-loaded {
+  color: #0a8a0a;
+  font-weight: bold;
+}
+
+.warning {
+  color: #ff6600;
+  font-weight: bold;
+}
+
+/* Responsive Design - Mobile First */
+
+/* Tablets and smaller (max-width: 768px) */
+@media screen and (max-width: 768px) {
+  .app {
+    max-width: 100%;
+    padding: 15px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  h3 {
+    font-size: 18px;
+  }
+
+  .section {
+    margin: 20px 0;
+    padding: 15px;
+  }
+
+  button {
+    padding: 12px 15px;
+    font-size: 14px;
+    width: 100%;
+  }
+
+  input, select {
+    padding: 10px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    width: 100%;
+  }
+
+  .form {
+    gap: 12px;
+  }
+
+  .game-info {
+    padding: 12px;
+  }
+
+  .game-info p {
+    font-size: 14px;
+    word-break: break-word;
+  }
+
+  .stored-game-item {
+    padding: 12px;
+  }
+
+  .stored-game-item p {
+    font-size: 14px;
+    word-break: break-all;
+  }
+
+  .loading {
+    padding: 15px 30px;
+    font-size: 16px;
+    max-width: 80%;
+    text-align: center;
+  }
+}
+
+/* Mobile phones (max-width: 480px) */
+@media screen and (max-width: 480px) {
+  .app {
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 20px;
+    padding-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  h3 {
+    font-size: 16px;
+  }
+
+  .section {
+    margin: 15px 0;
+    padding: 12px;
+  }
+
+  button {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  input, select {
+    padding: 10px 8px;
+    font-size: 16px;
+  }
+
+  .form {
+    gap: 10px;
+  }
+
+  .game-info {
+    padding: 10px;
+  }
+
+  .game-info p {
+    font-size: 13px;
+  }
+
+  .action-section {
+    margin-top: 15px;
+    padding-top: 15px;
+  }
+
+  .stored-game-item {
+    padding: 10px;
+  }
+
+  .stored-game-item p {
+    font-size: 13px;
+  }
+
+  .loading {
+    padding: 12px 20px;
+    font-size: 14px;
+    max-width: 90%;
+  }
+
+  .error {
+    padding: 12px;
+    font-size: 14px;
+  }
+}
+
+/* Very small devices (max-width: 320px) */
+@media screen and (max-width: 320px) {
+  .app {
+    padding: 8px;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
+
+  h2 {
+    font-size: 16px;
+  }
+
+  button {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  input, select {
+    padding: 8px 6px;
+    font-size: 14px;
+  }
+}
+
