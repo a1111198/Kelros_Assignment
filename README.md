@@ -39,9 +39,99 @@ Game data (including the salt and move) is stored in the browser's local storage
 - Track different games with different opponents
 - Resume games after closing the browser
 
-The salt is stored without encryption in local storage. While encryption could provide additional security, this implementation prioritizes user experience over additional security layers. The game timeout is only 5 minutes, creating a short window of vulnerability.
+#### Security Philosophy: Why Most Secure Solutions Require 4 Steps
 
-An alternative approach would be to use Web3 message signing, where the user signs a message to generate the salt at game creation and signs again during the reveal phase. However, the commit-reveal scheme already requires two user interactions (create and reveal). Adding signature requests would turn this into a four-step process: sign for salt, deploy contract, make move as Player 2, then sign again to reveal. For a casual game with small stakes and a 5-minute timeout, this added friction was considered excessive. The current implementation accepts the minor security trade-off in favor of a smoother user experience.
+The fundamental challenge with commit-reveal schemes is protecting the salt (secret) between game creation and reveal. Any truly secure solution typically requires 4 user interactions instead of 2. Here's an analysis of various approaches considered:
+
+**Alternative Approaches Evaluated:**
+
+1. **Password-Based Encryption**
+   - User enters a password to derive a key, encrypt the salt, and store it
+   - At reveal time, user re-enters the password to decrypt the salt
+   - *Trade-off*: Turns the 2-step process into 4 steps (password → create → play → password → reveal)
+
+2. **Key File Download/Upload**
+   - User downloads a JSON or .pk file containing the key at game creation
+   - User uploads the same file at reveal time
+   - *Trade-off*: Adds 2 steps (download key, upload key) and requires file management
+
+3. **Web3 Wallet Signatures**
+   - Sign a message to generate the salt at creation
+   - Sign again at reveal to regenerate the same salt
+   - *Trade-off*: 4-step process (sign → deploy → play → sign → reveal) with additional MetaMask popups
+
+4. **Server-Side Salt Storage**
+   - Generate and store salt on a backend server, return a token ID to frontend
+   - Frontend uses token to retrieve salt at reveal time
+   - *Trade-off*: Introduces centralization risks. If auth is required to retrieve salt, we're back to the same 4-step problem. If no auth, anyone with the token can retrieve the salt.
+
+**The Trust Context Consideration:**
+
+An important observation is that you're inviting a specific person to play (you start the game with their address). This means:
+- No random person can join your game
+- There's already an implicit trust relationship with your opponent
+- The threat model is primarily about protecting against local storage access attacks
+
+#### Advanced Security: WebAuthn with PRF Extension
+
+For users who want maximum security, this implementation supports **biometric-based encryption using WebAuthn with the PRF (Pseudo Random Function) extension**.
+
+**Why Standard WebAuthn Doesn't Work Directly:**
+
+Standard WebAuthn always derives a new key even with the same challenge, making it unsuitable for encryption/decryption workflows. We cannot simply:
+- Derive a key from biometrics at creation
+- Derive the same key at reveal time
+
+Even attempting to use a master key encrypted with credential ID fails because both the credential ID and encrypted key would be in browser storage—the very thing we're trying to protect against.
+
+**The Solution: WebAuthn PRF Extension**
+
+The PRF extension solves this by providing a **deterministic secret tied to biometric authentication**. The flow:
+
+1. **Registration Phase:**
+   - Biometric registration occurs
+   - Random master key is generated
+   - WebAuthn + PRF extension is invoked
+   - PRF output (not PRF salt) acts as a password to encrypt the master key
+
+2. **Game Creation:**
+   - Master key encrypts the game salt
+   - Encrypted salt is stored in local storage
+   - PRF salt is stored for later use
+
+3. **Reveal Phase:**
+   - User authenticates with biometrics
+   - PRF extension with stored PRF salt regenerates the same password
+   - Password decrypts the master key
+   - Master key decrypts the game salt
+   - Salt is sent to smart contract for reveal
+
+**Security Guarantee:** This approach is truly secure as long as the system hardware where the authenticator stores its data is not compromised. The secret is derived deterministically from biometrics and never stored in accessible browser storage.
+
+#### Fallback: PIN-Based Encryption
+
+Since WebAuthn PRF is not supported in all browsers, a PIN-based fallback is implemented:
+
+- User sets a 4-digit PIN at game creation
+- PIN is used to derive an encryption key (PBKDF2 with 100,000 iterations)
+- Encrypted salt is stored in local storage
+- At reveal, user re-enters PIN to decrypt
+
+**Security Analysis of PIN Fallback:**
+- 4-digit PIN = 10,000 possible combinations
+- 100,000 PBKDF2 iterations ≈ 0.1 seconds per attempt
+- Brute force time: 10,000 × 0.1s = 1,000 seconds ≈ **16.67 minutes**
+- Game timeout: **5 minutes**
+
+Since the timeout (5 min) is significantly less than the brute force time (17 min), the PIN approach remains secure for the game's duration.
+
+#### Current Implementation Choice
+
+The current implementation uses **WebAuthn PRF where supported, with PIN fallback for other browsers**. This provides:
+- Strong security through biometric/PIN protection
+- Protection against local storage read attacks
+- Reasonable UX with minimal additional steps
+- Hardware-backed security when available
 
 ### Timeout Handling
 
