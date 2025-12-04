@@ -12,6 +12,18 @@ import {
   saveGameResult,
   getGameResult
 } from './contracts';
+import {
+  isWebAuthnSupported,
+  isPlatformAuthenticatorAvailable,
+  hasRegisteredCredential,
+  registerWebAuthnCredential,
+  authenticateAndDeriveKey,
+  encryptGameData,
+  decryptGameData,
+  removeStoredCredential,
+  isPrfSupported,
+  checkPrfCapability
+} from './webAuthnCrypto';
 import './App.css';
 
 // local hashing is needed we can't fo it on chain.
@@ -55,7 +67,21 @@ function App() {
   });
   
   const [playMove, setPlayMove] = useState(MOVES.Rock);
-  const [revealData, setRevealData] = useState({ move: MOVES.Rock, salt: '' });
+  const [revealData, setRevealData] = useState({ 
+    move: MOVES.Rock, 
+    salt: '', 
+    isEncrypted: false,
+    encryptedData: null 
+  });
+  
+  // WebAuthn biometric encryption state
+  const [webAuthnSupported, setWebAuthnSupported] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [hasCredential, setHasCredential] = useState(false);
+  const [useEncryption, setUseEncryption] = useState(true); // Toggle for encryption
+  const [prfSupported, setPrfSupported] = useState(false); // PRF extension support (after registration)
+  const [prfCapable, setPrfCapable] = useState(false); // Browser PRF capability (before registration)
+  const [encryptionPin, setEncryptionPin] = useState(''); // PIN for non-PRF browsers
 
   useEffect(() => { 
     console.log('Checking for Ethereum provider...');
@@ -71,6 +97,24 @@ function App() {
     } catch (e) {
       console.error('Failed to load stored games:', e);
     }
+    
+    // Initialize WebAuthn support check
+    const initWebAuthn = async () => {
+      const supported = isWebAuthnSupported();
+      setWebAuthnSupported(supported);
+      
+      if (supported) {
+        const biometricAvail = await isPlatformAuthenticatorAvailable();
+        setBiometricAvailable(biometricAvail);
+        setHasCredential(hasRegisteredCredential());
+        setPrfSupported(isPrfSupported());
+        
+        // Check if browser is likely to support PRF (before registration)
+        const prfCap = await checkPrfCapability();
+        setPrfCapable(prfCap);
+      }
+    };
+    initWebAuthn();
     
     console.log(window.ethereum);
     if (window.ethereum) {
@@ -114,6 +158,55 @@ function App() {
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  // WebAuthn biometric registration
+  const registerBiometric = async () => {
+    try {
+      setError('');
+      setLoading(true);
+      
+      if (!webAuthnSupported) {
+        throw new Error('WebAuthn is not supported in this browser');
+      }
+      
+      if (!biometricAvailable) {
+        throw new Error('Platform biometric authenticator is not available');
+      }
+      
+      // Try registration - PIN may be required if PRF not supported
+      const result = await registerWebAuthnCredential('RPSLS Player', encryptionPin);
+      
+      // Check if PIN is needed (PRF was predicted to work but didn't)
+      if (result.needsPin) {
+        // PRF was not actually supported - update capability state and show message
+        setPrfCapable(false);
+        setError(result.message);
+        return;
+      }
+      
+      setHasCredential(true);
+      setPrfSupported(result.prfSupported);
+      
+      if (result.prfSupported) {
+        alert('Biometric credential registered with PRF support! Your game data will be fully protected by biometric.');
+      } else {
+        alert('Biometric credential registered! Note: Your browser requires a PIN along with biometric for encryption.');
+      }
+      
+    } catch (err) {
+      console.error('Biometric registration failed:', err);
+      setError(err.message || 'Failed to register biometric');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Remove biometric credential
+  const removeBiometric = () => {
+    removeStoredCredential();
+    setHasCredential(false);
+    alert('Biometric credential removed. Game data will no longer be encrypted.');
   };
 
   
@@ -164,7 +257,24 @@ function App() {
       const deployedAddress = contract.address;
       console.log('Contract deployed at:', deployedAddress);
       
-      saveGameData(deployedAddress, createFormData.move, salt.toString());
+      // Save game data - encrypted if biometric is available and enabled
+      if (useEncryption && hasCredential) {
+        try {
+          // Authenticate with biometric and encrypt the salt
+          // Pass PIN if PRF not supported
+          const key = await authenticateAndDeriveKey(prfSupported ? '' : encryptionPin);
+          const encryptedData = await encryptGameData(key, createFormData.move, salt.toString());
+          saveGameData(deployedAddress, createFormData.move, salt.toString(), encryptedData);
+          console.log('Game data saved with biometric encryption');
+        } catch (encryptErr) {
+          console.error('Encryption failed, falling back to unencrypted storage:', encryptErr);
+          // Fallback to unencrypted storage if encryption fails
+          saveGameData(deployedAddress, createFormData.move, salt.toString());
+        }
+      } else {
+        // No encryption - save directly
+        saveGameData(deployedAddress, createFormData.move, salt.toString());
+      }
       
       setStoredGames(getStoredGames());
       
@@ -225,15 +335,29 @@ function App() {
         setGameResult(null);
       }
       
-      // using address so a player can play multiple games with different party or same party. 
+      // Load saved game data - but DON'T decrypt here
+      // Decryption only happens when actually revealing the move
       const savedGame = getGameData(address);
       if (savedGame) {
-        setRevealData({
-          move: savedGame.move,
-          salt: savedGame.salt
-        });
+        if (savedGame.isEncrypted && savedGame.encryptedData) {
+          // Mark that we have encrypted data, but don't decrypt yet
+          // The actual decryption happens in revealMove()
+          setRevealData({
+            move: MOVES.Rock, // Placeholder - will be decrypted when needed
+            salt: '',
+            isEncrypted: true,
+            encryptedData: savedGame.encryptedData
+          });
+        } else {
+          // Unencrypted data - can load directly
+          setRevealData({
+            move: savedGame.move,
+            salt: savedGame.salt,
+            isEncrypted: false
+          });
+        }
       } else {
-        setRevealData({ move: MOVES.Rock, salt: '' });
+        setRevealData({ move: MOVES.Rock, salt: '', isEncrypted: false });
       }
       
     } catch (err) {
@@ -269,7 +393,25 @@ function App() {
       setError('');
       setLoading(true);
       
-      if (!revealData.salt) {
+      let moveToReveal = revealData.move;
+      let saltToReveal = revealData.salt;
+      
+      // If data is encrypted, decrypt it now with biometric
+      if (revealData.isEncrypted && revealData.encryptedData) {
+        try {
+          // Pass PIN if PRF not supported
+          const key = await authenticateAndDeriveKey(prfSupported ? '' : encryptionPin);
+          const decryptedData = await decryptGameData(key, revealData.encryptedData);
+          moveToReveal = decryptedData.move;
+          saltToReveal = decryptedData.salt;
+          console.log('Game data decrypted for reveal');
+        } catch (decryptErr) {
+          throw new Error('Biometric authentication failed. Please try again.' + 
+            (!prfSupported ? ' Make sure to enter the correct PIN.' : ''));
+        }
+      }
+      
+      if (!saltToReveal) {
         throw new Error('Salt is required to reveal');
       }
       
@@ -283,9 +425,9 @@ function App() {
       
    
       const j2Move = gameState.c2;
-      const j1Move = revealData.move;
+      const j1Move = moveToReveal;
       
-      const tx = await contract.solve(revealData.move, revealData.salt);
+      const tx = await contract.solve(moveToReveal, saltToReveal);
       await tx.wait();
       
       const j1Wins = await contract.win(j1Move, j2Move);
@@ -460,6 +602,109 @@ function App() {
         )}
       </div>
 
+      {/* WebAuthn Biometric Security Section */}
+      {webAuthnSupported && biometricAvailable && (
+        <div className="section">
+          <h2> Biometric Security</h2>
+          <p className="info-text">
+            Protect your game secrets (salt) with biometric encryption using WebAuthn.
+          </p>
+          
+          {!hasCredential ? (
+            <div>
+              <p>No biometric credential registered. Your game data will be stored unencrypted.</p>
+              
+              {/* Show PRF capability status */}
+              {prfCapable ? (
+                <p className="success-text">Your browser may support PRF - biometric-only encryption may be available!</p>
+              ) : (
+                <p className="warning-text">Your browser doesn't support PRF extension. PIN required for security.</p>
+              )}
+              
+              {/* Always show PIN input as fallback - PRF capability is just a prediction */}
+              <div className="form" style={{ marginBottom: '15px' }}>
+                <div>
+                  <label>Security PIN {prfCapable ? '(optional - backup if PRF fails)' : '(required)'}:</label>
+                  <input 
+                    type="password"
+                    value={encryptionPin}
+                    onChange={(e) => setEncryptionPin(e.target.value)}
+                    placeholder="Enter a PIN (min 4 characters)"
+                    minLength={4}
+                  />
+                  <p className="info-text small">
+                    {prfCapable 
+                      ? 'Provide a PIN as backup. If your device fully supports PRF, it won\'t be needed.'
+                      : 'This PIN will be required along with biometric for encryption/decryption.'}
+                  </p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={registerBiometric} 
+                disabled={loading || (!prfCapable && encryptionPin.length < 4)}
+                className="biometric-btn"
+              >
+                {loading ? 'Registering...' : '🔒 Register Biometric'}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="success-text">✅ Biometric credential registered</p>
+              {prfSupported ? (
+                <p className="info-text">🎉 PRF enabled - biometric-only encryption active!</p>
+              ) : (
+                <div className="form" style={{ marginTop: '10px' }}>
+                  <div>
+                    <label>Security PIN (required for encryption/decryption):</label>
+                    <input 
+                      type="password"
+                      value={encryptionPin}
+                      onChange={(e) => setEncryptionPin(e.target.value)}
+                      placeholder="Enter your PIN"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="encryption-toggle">
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={useEncryption} 
+                    onChange={(e) => setUseEncryption(e.target.checked)}
+                  />
+                  Encrypt game data with biometric
+                </label>
+              </div>
+              <button 
+                onClick={removeBiometric} 
+                className="danger-btn"
+                style={{ marginTop: '10px' }}
+              >
+                Remove Biometric Credential
+              </button>
+            </div>
+          )}
+          
+          <p className="info-text small">
+            {!hasCredential 
+              ? 'We\'ll check if your device supports PRF during registration. If not, PIN will be required.'
+              : prfSupported 
+                ? 'Your game data is protected by biometric authentication only.'
+                : 'You\'ll need biometric + PIN to create games and reveal moves.'}
+          </p>
+        </div>
+      )}
+      
+      {webAuthnSupported && !biometricAvailable && (
+        <div className="section">
+          <h2>Biometric Security</h2>
+          <p className="warning-text">
+            Platform biometric authenticator not available. Game data will be stored unencrypted.
+          </p>
+        </div>
+      )}
+
       {error && (
         <div className="error">
           <strong>Error:</strong> {error}
@@ -632,13 +877,26 @@ function App() {
                   <p>Player 2 played: <strong>{MOVE_NAMES[gameState.c2]}</strong></p>
                   {getGameData(contractAddress) ? (
                     <>
-                     
-                      <p>Your move: <strong>{MOVE_NAMES[revealData.move]}</strong></p>
-                      <div className="form">
-                        <button onClick={revealMove} disabled={loading || !revealData.salt}>
-                          {loading ? 'Revealing...' : 'Reveal & Resolve Game'}
-                        </button>
-                      </div>
+                      {revealData.isEncrypted ? (
+                        <>
+                          <p>Your game data is <span className="encrypted-badge">Encrypted</span></p>
+                          <p className="info-text">Biometric authentication will be required when you click reveal.</p>
+                          <div className="form">
+                            <button onClick={revealMove} disabled={loading}>
+                              {loading ? 'Revealing...' : 'Authenticate & Reveal'}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p>Your move: <strong>{MOVE_NAMES[revealData.move]}</strong></p>
+                          <div className="form">
+                            <button onClick={revealMove} disabled={loading || !revealData.salt}>
+                              {loading ? 'Revealing...' : 'Reveal & Resolve Game'}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>

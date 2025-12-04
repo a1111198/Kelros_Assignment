@@ -205,18 +205,32 @@ export const getStoredGames = () => {
 };
 
 // Save game data to localStorage with contract address as key
-export const saveGameData = (contractAddress, move, salt) => {
+// Supports both encrypted (with encryptedData) and unencrypted storage
+export const saveGameData = (contractAddress, move, salt, encryptedData = null) => {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return;
   }
   
   try {
     const key = STORAGE_KEY_PREFIX + contractAddress.toLowerCase();
-    const data = {
-      move,
-      salt: salt.toString(),
-      createdAt: Date.now()
-    };
+    let data;
+    
+    if (encryptedData) {
+      // Store encrypted data
+      data = {
+        encryptedData,
+        isEncrypted: true,
+        createdAt: Date.now()
+      };
+    } else {
+      // Store unencrypted data (fallback)
+      data = {
+        move,
+        salt: salt.toString(),
+        isEncrypted: false,
+        createdAt: Date.now()
+      };
+    }
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
     console.error('Failed to save game data:', e);
