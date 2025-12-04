@@ -224,24 +224,44 @@ Timeout state is updated when the "Refresh Player 2 State" function is called, a
 
 1. **Connect Wallet**: Click the connect button and approve MetaMask connection
 2. **Select Network**: Ensure you are connected to Sepolia testnet (the app will prompt if not)
-3. **Create Game (Player 1)**:
+3. **Security Setup (First Time Only)**:
+   - If your browser supports WebAuthn PRF, you'll be prompted for biometric registration
+   - If not supported, you'll set up a 4-digit PIN for salt encryption
+   - This step only happens once per browser/device
+4. **Create Game (Player 1)**:
    - Enter the opponent's Ethereum address
-   - Choose your move
+   - Choose your move (Rock, Paper, Scissors, Lizard, or Spock)
    - Enter the stake amount in ETH
+   - **If using WebAuthn PRF**: Authenticate with biometrics to encrypt your move's salt
+   - **If using PIN fallback**: Enter your PIN to encrypt the salt
    - Click "Create Game" to deploy the contract
    - Save the contract address to share with your opponent
-4. **Join Game (Player 2)**:
+5. **Join Game (Player 2)**:
    - Enter the contract address provided by Player 1
+   - The app loads game details (stake amount, timeout status)
    - Choose your move
-   - Send the matching stake amount
-5. **Reveal (Player 1)**:
+   - Send the matching stake amount with your transaction
+6. **Reveal (Player 1)**:
+   - Load the game using the contract address
+   - **If using WebAuthn PRF**: Authenticate with biometrics to decrypt your salt
+   - **If using PIN fallback**: Enter your PIN to decrypt the salt
    - Click reveal to show your original move
-   - The smart contract determines the winner
-   - Funds are distributed automatically
+   - The smart contract determines the winner and distributes funds automatically
+
+### Security Modes
+
+The app automatically detects browser capabilities and uses the most secure available option:
+
+| Mode | Security Level | User Experience |
+|------|---------------|-----------------|
+| **WebAuthn PRF** | Highest - Hardware-backed biometric encryption | Biometric prompt at create & reveal |
+| **PIN Fallback** | High - PBKDF2 encrypted (secure within 5-min timeout) | 4-digit PIN at create & reveal |
 
 ### Loading Existing Games
 
 You can load previously created or joined games by entering the contract address in the "Load Existing Game" field. The app will retrieve the game state and allow you to continue playing.
+
+**Note**: When loading a game you created (as Player 1), you'll need to authenticate (biometric or PIN) to decrypt your stored salt for the reveal phase.
 
 ## Technology Stack
 
