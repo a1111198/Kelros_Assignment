@@ -45,7 +45,7 @@ const validateAddress = (address) => {
   }
 };
 
-function App() { 
+function App() {
   const [account, setAccount] = useState('');
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
@@ -176,15 +176,6 @@ function App() {
       
       // Try registration - PIN may be required if PRF not supported
       const result = await registerWebAuthnCredential('RPSLS Player', encryptionPin);
-      
-      // Check if PIN is needed (PRF was predicted to work but didn't)
-      if (result.needsPin) {
-        // PRF was not actually supported - update capability state and show message
-        setPrfCapable(false);
-        setError(result.message);
-        return;
-      }
-      
       setHasCredential(true);
       setPrfSupported(result.prfSupported);
       
@@ -616,43 +607,42 @@ function App() {
               
               {/* Show PRF capability status */}
               {prfCapable ? (
-                <p className="success-text">Your browser may support PRF - biometric-only encryption may be available!</p>
+                <p className="success-text">Your browser supports PRF - biometric-only encryption available!</p>
               ) : (
-                <p className="warning-text">Your browser doesn't support PRF extension. PIN required for security.</p>
+                <>
+                  <p className="warning-text">Your browser doesn't support PRF extension. PIN required for security.</p>
+                  {/* PIN input - only shown if PRF is NOT supported */}
+                  <div className="form" style={{ marginBottom: '15px' }}>
+                    <div>
+                      <label>Security PIN (required):</label>
+                      <input 
+                        type="password"
+                        value={encryptionPin}
+                        onChange={(e) => setEncryptionPin(e.target.value)}
+                        placeholder="Enter a PIN (min 4 characters)"
+                        minLength={4}
+                      />
+                      <p className="info-text small">
+                        This PIN will be required along with biometric for encryption/decryption.
+                      </p>
+                    </div>
+                  </div>
+                </>
               )}
-              
-              {/* Always show PIN input as fallback - PRF capability is just a prediction */}
-              <div className="form" style={{ marginBottom: '15px' }}>
-                <div>
-                  <label>Security PIN {prfCapable ? '(optional - backup if PRF fails)' : '(required)'}:</label>
-                  <input 
-                    type="password"
-                    value={encryptionPin}
-                    onChange={(e) => setEncryptionPin(e.target.value)}
-                    placeholder="Enter a PIN (min 4 characters)"
-                    minLength={4}
-                  />
-                  <p className="info-text small">
-                    {prfCapable 
-                      ? 'Provide a PIN as backup. If your device fully supports PRF, it won\'t be needed.'
-                      : 'This PIN will be required along with biometric for encryption/decryption.'}
-                  </p>
-                </div>
-              </div>
               
               <button 
                 onClick={registerBiometric} 
                 disabled={loading || (!prfCapable && encryptionPin.length < 4)}
                 className="biometric-btn"
               >
-                {loading ? 'Registering...' : '🔒 Register Biometric'}
+                {loading ? 'Registering...' : 'Register Biometric'}
               </button>
             </div>
           ) : (
             <div>
-              <p className="success-text">✅ Biometric credential registered</p>
+              <p className="success-text">Biometric credential registered</p>
               {prfSupported ? (
-                <p className="info-text">🎉 PRF enabled - biometric-only encryption active!</p>
+                <p className="info-text">PRF enabled - biometric-only encryption active!</p>
               ) : (
                 <div className="form" style={{ marginTop: '10px' }}>
                   <div>
@@ -687,11 +677,7 @@ function App() {
           )}
           
           <p className="info-text small">
-            {!hasCredential 
-              ? 'We\'ll check if your device supports PRF during registration. If not, PIN will be required.'
-              : prfSupported 
-                ? 'Your game data is protected by biometric authentication only.'
-                : 'You\'ll need biometric + PIN to create games and reveal moves.'}
+            When enabled, you'll need biometric + PIN to create games and reveal moves.
           </p>
         </div>
       )}
